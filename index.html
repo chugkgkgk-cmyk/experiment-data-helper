@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>실험 데이터 처리 도우미</title>
+<style>
+  /* ---------- 기본 색과 글꼴 ---------- */
+  :root {
+    --ink: #1c2a39;        /* 본문 글자 */
+    --sub: #46607a;        /* 보조 글자 */
+    --teal: #0b5563;       /* 주 색 */
+    --teal-soft: #e3f1f2;
+    --amber: #ffd54a;      /* 형광펜 */
+    --orange: #c96a00;     /* 그래프 직선 */
+    --grid: #dde7f0;       /* 모눈 */
+    --line: #b9cfdb;
+    --warn: #8a4b00;
+    --warn-bg: #fff4dc;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    color: var(--ink);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    line-height: 1.55;
+    /* 모눈종이 배경 */
+    background-color: #f8fbfd;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 22px 16px 60px; }
+
+  header { display: flex; gap: 14px; align-items: center; margin-bottom: 14px; }
+  .logo {
+    width: 54px; height: 54px; flex: none;
+    border-radius: 14px; background: var(--teal); color: #fff;
+    display: grid; place-items: center; font-size: 34px; font-weight: 700;
+  }
+  h1 { font-size: 26px; margin: 0; letter-spacing: -0.5px; }
+  header p { margin: 2px 0 0; color: var(--sub); font-size: 15px; }
+
+  /* ---------- 탭 ---------- */
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 18px 0 0; }
+  .tabs button {
+    font: inherit; font-size: 15px; font-weight: 600;
+    border: 2px solid var(--teal); border-bottom: none;
+    background: #fff; color: var(--teal);
+    padding: 9px 16px; border-radius: 12px 12px 0 0; cursor: pointer;
+  }
+  .tabs button.on { background: var(--teal); color: #fff; }
+
+  .panel {
+    display: none; background: #fff;
+    border: 2px solid var(--teal); border-radius: 0 14px 14px 14px;
+    padding: 20px;
+  }
+  .panel.on { display: block; }
+
+  /* ---------- 입력 ---------- */
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > label { flex: 1 1 150px; }
+  label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+  label small { font-weight: 400; color: var(--sub); }
+  input, select, textarea {
+    display: block; width: 100%; margin-top: 4px;
+    font: inherit; font-size: 15px; color: var(--ink);
+    border: 1.5px solid var(--line); border-radius: 9px; padding: 8px 10px;
+    background: #fff;
+  }
+  textarea { min-height: 120px; font-family: "Consolas", "D2Coding", monospace; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 3px solid var(--amber); border-color: var(--teal); }
+
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 16px; }
+  .btn {
+    font: inherit; font-size: 15px; font-weight: 700;
+    border: none; border-radius: 10px; padding: 10px 18px; cursor: pointer;
+    background: var(--teal); color: #fff;
+  }
+  .btn.light { background: var(--teal-soft); color: var(--teal); }
+
+  /* ---------- 결과 ---------- */
+  .result { border-top: 2px dashed var(--line); padding-top: 16px; }
+  .answer {
+    display: inline-block; font-size: 26px; font-weight: 700;
+    padding: 2px 8px; margin: 2px 0 8px;
+    background: linear-gradient(transparent 55%, var(--amber) 55%);
+  }
+  .answer-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .copy {
+    font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+    border: 1.5px solid var(--teal); color: var(--teal); background: #fff;
+    border-radius: 8px; padding: 4px 10px;
+  }
+  .note { color: var(--sub); font-size: 14px; margin: 4px 0; }
+  .warn {
+    background: var(--warn-bg); color: var(--warn); border-radius: 10px;
+    padding: 10px 12px; font-size: 14px; margin: 8px 0;
+  }
+  table { border-collapse: collapse; margin: 8px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 4px 10px; text-align: right; }
+  th { background: var(--teal-soft); color: var(--teal); }
+  td:first-child, th:first-child { text-align: center; }
+  .summary td:first-child { text-align: left; font-weight: 600; }
+
+  details { margin-top: 14px; border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+  summary { cursor: pointer; font-weight: 700; color: var(--teal); }
+  .steps ol { padding-left: 22px; margin: 10px 0 0; }
+  .steps li { margin-bottom: 10px; }
+  .eq { font-family: "Cambria Math", "Times New Roman", serif; font-size: 16px; }
+  .scroll { overflow-x: auto; }
+
+  svg.graph { width: 100%; max-width: 640px; height: auto; display: block; margin: 8px 0; }
+  .help { font-size: 14px; color: var(--sub); background: var(--teal-soft); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
+  footer { margin-top: 22px; font-size: 13px; color: var(--sub); text-align: center; }
+
+  @media (max-width: 600px) {
+    h1 { font-size: 21px; }
+    .panel { padding: 14px; }
+    .answer { font-size: 21px; }
+    .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+    .tabs button { font-size: 13px; padding: 8px 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="logo">±</div>
+  <div>
+    <h1>실험 데이터 처리 도우미</h1>
+    <p>측정값을 붙여 넣으면 평균·불확도·기울기·유효숫자를 보고서 형식으로 정리해 줍니다. 계산 과정도 같이 보여 줘요.</p>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="repeat" class="on">① 반복 측정</button>
+  <button data-tab="graph">② 그래프·기울기</button>
+  <button data-tab="sig">③ 유효숫자 계산</button>
+</nav>
+
+<!-- ================= ① 반복 측정 ================= -->
+<section id="repeat" class="panel on">
+  <div class="help">같은 양을 여러 번 잰 값(예: 주기 5회)을 넣으면 평균과 불확도를 구해서 <b>측정값 ± 불확도</b> 꼴로 맞춰 줍니다.</div>
+  <div class="row">
+    <label>물리량 이름 <input id="r-name" value="T"></label>
+    <label>단위 <input id="r-unit" value="s"></label>
+  </div>
+  <label>측정값 <small>(띄어쓰기·줄바꿈·쉼표로 구분, 엑셀에서 복사해 붙여 넣어도 돼요)</small>
+    <textarea id="r-data" placeholder="1.42 1.45 1.40 1.44 1.43"></textarea>
+  </label>
+  <div class="row">
+    <label>불확도 기준
+      <select id="r-mode">
+        <option value="se">평균의 표준오차 (s/√n)</option>
+        <option value="sd">표준편차 (s)</option>
+        <option value="inst">기기 불확도만</option>
+        <option value="comb">표준오차와 기기 불확도 합성</option>
+      </select>
+    </label>
+    <label id="r-inst-box">기기 불확도 <small>(보통 최소 눈금의 절반)</small>
+      <input id="r-inst" type="number" step="any" placeholder="예: 0.005">
+    </label>
+    <label>불확도 유효숫자
+      <select id="r-k">
+        <option value="1">1자리</option>
+        <option value="2">2자리</option>
+      </select>
+    </label>
+  </div>
+  <div class="btns">
+    <button class="btn" id="r-run">계산하기</button>
+    <button class="btn light" id="r-ex">예시 넣기</button>
+  </div>
+  <div id="r-out" class="result"></div>
+</section>
+
+<!-- ================= ② 그래프·기울기 ================= -->
+<section id="graph" class="panel">
+  <div class="help">두 물리량을 한 줄에 하나씩 <b>x y</b> 순서로 넣으면 그래프를 그리고 최소제곱법으로 기울기·절편과 그 불확도를 구합니다. 곡선 관계는 변환(예: y를 제곱)으로 직선으로 바꿔서 볼 수 있어요.</div>
+  <div class="row">
+    <label>x 이름 <input id="g-xn" value="L"></label>
+    <label>x 단위 <input id="g-xu" value="m"></label>
+    <label>x 변환
+      <select id="g-xt">
+        <option value="none">그대로</option><option value="sq">제곱</option>
+        <option value="sqrt">제곱근</option><option value="inv">역수</option><option value="ln">자연로그</option>
+      </select>
+    </label>
+  </div>
+  <div class="row">
+    <label>y 이름 <input id="g-yn" value="T"></label>
+    <label>y 단위 <input id="g-yu" value="s"></label>
+    <label>y 변환
+      <select id="g-yt">
+        <option value="none">그대로</option><option value="sq">제곱</option>
+        <option value="sqrt">제곱근</option><option value="inv">역수</option><option value="ln">자연로그</option>
+      </select>
+    </label>
+  </div>
+  <label>데이터 <small>(한 줄에 x y, 제목 줄은 알아서 건너뜀)</small>
+    <textarea id="g-data" placeholder="0.20 0.90&#10;0.30 1.10&#10;0.40 1.27"></textarea>
+  </label>
+  <div class="row">
+    <label>직선 모양
+      <select id="g-model">
+        <option value="ab">y = ax + b</option>
+        <option value="a0">원점을 지나는 y = ax</option>
+      </select>
+    </label>
+    <label>불확도 유효숫자
+      <select id="g-k">
+        <option value="1">1자리</option>
+        <option value="2">2자리</option>
+      </select>
+    </label>
+  </div>
+  <div class="btns">
+    <button class="btn" id="g-run">계산하기</button>
+    <button class="btn light" id="g-ex">예시 넣기</button>
+  </div>
+  <div id="g-out" class="result"></div>
+</section>
+
+<!-- ================= ③ 유효숫자 계산 ================= -->
+<section id="sig" class="panel">
+  <div class="help">
+    식을 넣으면 유효숫자 규칙에 맞춰 답을 맞춰 줍니다. 숫자 하나만 넣으면 유효숫자가 몇 개인지 알려 줘요.<br>
+    쓸 수 있는 것: <b>+ − × ÷ ^ ( )</b>, <b>pi</b>, <b>6.02e23</b> 같은 지수 표기.
+    개수나 정의값처럼 <b>정확한 수</b>는 <b>{4}</b>처럼 중괄호로 감싸세요.
+  </div>
+  <label>식
+    <input id="s-expr" placeholder="(51.05 - 48.126) / 58.44 / 0.2500">
+  </label>
+  <div class="btns">
+    <button class="btn" id="s-run">계산하기</button>
+    <button class="btn light" id="s-ex">예시 넣기</button>
+  </div>
+  <div id="s-out" class="result"></div>
+</section>
+
+<footer>전곽 SW 경시대회 2026 출품작 · 계산은 모두 이 페이지 안에서 이루어지고 입력한 값은 어디에도 저장되지 않습니다.</footer>
+</div>
+
+<script>
+/* =========================================================
+   공통 도구: 숫자 읽기, 반올림, 자리 이름
+   ========================================================= */
+
+// 글자 속에서 숫자만 골라낸다. 숫자가 아닌 것은 skipped에 모아 둔다.
+function parseNumbers(text) {
+  const tokens = text.split(/[\s,;]+/).filter(t => t !== '');
+  const nums = [], skipped = [];
+  for (const t of tokens) {
+    const v = Number(t.replace('−', '-'));
+    if (isFinite(v)) nums.push(v); else skipped.push(t);
+  }
+  return { nums, skipped };
+}
+
+// 컴퓨터 계산에서 생기는 1.4249999999 같은 꼬리를 정리한다.
+function clean(x) { return Number(x.toPrecision(12)); }
+
+// x의 가장 큰 자리(10의 몇 제곱 자리인지). 예: 1.42 → 0, 0.0067 → -3
+function orderOf(x) { return Math.floor(Math.log10(Math.abs(x))); }
+
+// x를 10^lsd 자리에서 반올림한다 (lsd = -2이면 소수 둘째 자리까지 남김).
+// 문자열 지수 표기를 써서 1.005 같은 값도 제대로 반올림되게 한다.
+function roundAt(x, lsd) {
+  x = clean(x);
+  const sign = x < 0 ? -1 : 1;
+  const [m, e] = Math.abs(x).toExponential().split('e');
+  const shifted = Number(m + 'e' + (Number(e) - lsd));
+  return sign * Number(Math.round(shifted) + 'e' + lsd);
+}
+
+// 반올림한 값을 그 자리까지 글자로 보여 준다. 예: (1.4250, -3) → "1.425"
+function fixedAt(x, lsd) { return roundAt(x, lsd).toFixed(Math.max(0, -lsd)); }
+
+// 계산 과정에 보여 줄 숫자 (유효숫자 6개 정도면 충분)
+function show(x, p = 6) {
+  if (!isFinite(x)) return String(x);
+  return String(Number(x.toPrecision(p)));
+}
+
+// 자리 이름. -2 → "소수 둘째 자리"
+function placeName(lsd) {
+  const small = ['첫째', '둘째', '셋째', '넷째', '다섯째', '여섯째', '일곱째', '여덟째'];
+  const big = ['일의 자리', '십의 자리', '백의 자리', '천의 자리', '만의 자리'];
+  if (lsd < 0) return '소수 ' + (small[-lsd - 1] || (-lsd) + '번째') + ' 자리';
+  return big[lsd] || '10^' + lsd + ' 자리';
+}
+
+// 불확도를 유효숫자 k자리로 반올림하고, 마지막 자리(lsd)를 함께 돌려준다.
+function roundUncertainty(u, k) {
+  let lsd = orderOf(clean(u)) - (k - 1);
+  let value = roundAt(u, lsd);
+  // 0.0096 → 0.010 처럼 반올림하면서 자리가 올라가는 경우를 다시 맞춘다.
+  const lsd2 = orderOf(value) - (k - 1);
+  if (lsd2 > lsd) { lsd = lsd2; value = roundAt(u, lsd); }
+  return { value, lsd };
+}
+
+// 유효숫자 sf개로 보기 좋게 쓴다. 끝자리 0이 애매해지면 ×10^n 꼴로 바꾼다.
+function formatSig(v, sf) {
+  if (v === 0) return '0';
+  const r = Number(v.toPrecision(sf));
+  const e = orderOf(r);
+  const decimals = sf - 1 - e;
+  const plain = r.toFixed(Math.max(0, decimals));
+  const ambiguous = decimals <= 0 && /0$/.test(plain);
+  if (ambiguous || e < -4 || e > 6) {
+    const mant = (r / Math.pow(10, e)).toFixed(sf - 1);
+    return mant + ' × 10' + superscript(e);
+  }
+  return plain;
+}
+function superscript(n) {
+  const map = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+  return String(n).split('').map(c => map[c]).join('');
+}
+
+// 결과 한 줄을 클립보드에 복사한다.
+function copyText(text, btn) {
+  const done = () => { const old = btn.textContent; btn.textContent = '복사됨'; setTimeout(() => btn.textContent = old, 1200); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  } else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done) {
+  const t = document.createElement('textarea');
+  t.value = text; document.body.appendChild(t); t.select();
+  try { document.execCommand('copy'); done(); } catch (e) { /* 복사가 막힌 환경: 화면의 글자를 직접 선택해서 복사 */ }
+  t.remove();
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function $(id) { return document.getElementById(id); }
+
+/* =========================================================
+   ① 반복 측정: 평균, 표준편차, 표준오차, 불확도
+   ========================================================= */
+
+function analyzeRepeat(nums, mode, inst, k) {
+  const n = nums.length;
+  const sum = nums.reduce((a, b) => a + b, 0);
+  const mean = sum / n;
+  const dev = nums.map(x => x - mean);
+  const ss = dev.reduce((a, d) => a + d * d, 0);          // 편차 제곱의 합
+  const sd = n > 1 ? Math.sqrt(ss / (n - 1)) : NaN;       // 표준편차 (n-1로 나눔)
+  const se = n > 1 ? sd / Math.sqrt(n) : NaN;             // 평균의 표준오차
+
+  let u, uLabel;
+  if (mode === 'se') { u = se; uLabel = '평균의 표준오차 s/√n'; }
+  if (mode === 'sd') { u = sd; uLabel = '표준편차 s'; }
+  if (mode === 'inst') { u = inst; uLabel = '기기 불확도'; }
+  if (mode === 'comb') { u = Math.sqrt(se * se + inst * inst); uLabel = '표준오차와 기기 불확도 합성 √(a² + b²)'; }
+
+  return { n, sum, mean, dev, ss, sd, se, u, uLabel };
+}
+
+function runRepeat() {
+  const out = $('r-out');
+  const name = $('r-name').value.trim() || 'x';
+  const unit = $('r-unit').value.trim();
+  const mode = $('r-mode').value;
+  const k = Number($('r-k').value);
+  const inst = Number($('r-inst').value);
+  const { nums, skipped } = parseNumbers($('r-data').value);
+  let html = '';
+
+  if (skipped.length) html += `<div class="warn">숫자가 아니라서 뺀 항목: ${esc(skipped.join(', '))}</div>`;
+  if (nums.length === 0) { out.innerHTML = html + '<div class="warn">측정값을 넣어 주세요.</div>'; return; }
+  if ((mode === 'se' || mode === 'sd' || mode === 'comb') && nums.length < 2) {
+    out.innerHTML = html + '<div class="warn">표준편차를 구하려면 측정값이 2개 이상 있어야 해요. 하나뿐이면 불확도 기준을 "기기 불확도만"으로 바꾸세요.</div>'; return;
+  }
+  if ((mode === 'inst' || mode === 'comb') && !(inst > 0)) {
+    out.innerHTML = html + '<div class="warn">기기 불확도를 0보다 큰 값으로 넣어 주세요.</div>'; return;
+  }
+
+  const r = analyzeRepeat(nums, mode, inst, k);
+  if (!(r.u > 0)) {
+    out.innerHTML = html + '<div class="warn">측정값이 모두 같아서 표준편차가 0이에요. 이럴 땐 기기 불확도를 쓰는 게 맞아요.</div>'; return;
+  }
+
+  const U = roundUncertainty(r.u, k);
+  const meanText = fixedAt(r.mean, U.lsd);
+  const uText = fixedAt(U.value, U.lsd);
+  const u_ = unit ? ' ' + unit : '';
+  const answer = `${name} = ${meanText} ± ${uText}${u_}`;
+  const rel = Math.abs(U.value / r.mean) * 100;
+
+  html += `<div class="answer-line"><span class="answer">${esc(answer)}</span>
+           <button class="copy" id="r-copy">복사</button></div>`;
+  html += `<p class="note">불확도 기준: ${r.uLabel} · 측정 횟수 n = ${r.n} · 상대 불확도 ${show(rel, 2)} %</p>`;
+
+  html += `<table class="summary"><tr><th>항목</th><th>값</th></tr>
+    <tr><td>평균</td><td>${show(r.mean, 8)}</td></tr>
+    ${r.n > 1 ? `<tr><td>표준편차 s</td><td>${show(r.sd)}</td></tr>
+    <tr><td>평균의 표준오차 s/√n</td><td>${show(r.se)}</td></tr>` : ''}
+    ${(mode === 'inst' || mode === 'comb') ? `<tr><td>기기 불확도</td><td>${show(inst)}</td></tr>` : ''}
+    <tr><td>사용한 불확도 (반올림 전)</td><td>${show(r.u)}</td></tr></table>`;
+
+  // ----- 계산 과정 -----
+  let steps = '<ol>';
+  steps += `<li>평균: <span class="eq">x̄ = (${nums.map(v => show(v, 10)).join(' + ')}) ÷ ${r.n} = ${show(r.sum, 10)} ÷ ${r.n} = ${show(r.mean, 8)}</span></li>`;
+  if (r.n > 1) {
+    if (r.n <= 30) {
+      steps += `<li>각 값이 평균에서 얼마나 떨어졌는지(편차) 구하고 제곱한다.<div class="scroll"><table>
+        <tr><th>i</th><th>xᵢ</th><th>xᵢ − x̄</th><th>(xᵢ − x̄)²</th></tr>
+        ${nums.map((v, i) => `<tr><td>${i + 1}</td><td>${show(v, 10)}</td><td>${show(r.dev[i])}</td><td>${show(r.dev[i] * r.dev[i])}</td></tr>`).join('')}
+        <tr><td colspan="3">합</td><td>${show(r.ss)}</td></tr></table></div></li>`;
+    } else {
+      steps += `<li>편차 제곱의 합: <span class="eq">Σ(xᵢ − x̄)² = ${show(r.ss)}</span></li>`;
+    }
+    steps += `<li>표준편차: <span class="eq">s = √( ${show(r.ss)} ÷ (${r.n} − 1) ) = ${show(r.sd)}</span></li>`;
+    steps += `<li>평균의 표준오차: <span class="eq">s/√n = ${show(r.sd)} ÷ √${r.n} = ${show(r.se)}</span></li>`;
+  }
+  if (mode === 'comb') steps += `<li>합성 불확도: <span class="eq">√( ${show(r.se)}² + ${show(inst)}² ) = ${show(r.u)}</span></li>`;
+  steps += `<li>불확도를 유효숫자 ${k}자리로 반올림: <span class="eq">${show(r.u)} → ${uText}</span> (마지막 자리: ${placeName(U.lsd)})</li>`;
+  steps += `<li>평균도 같은 자리(${placeName(U.lsd)})까지 반올림: <span class="eq">${show(r.mean, 8)} → ${meanText}</span></li>`;
+  steps += `<li>정리: <b>${esc(answer)}</b></li></ol>`;
+
+  html += `<details class="steps"><summary>계산 과정 보기</summary>${steps}</details>`;
+  out.innerHTML = html;
+  $('r-copy').onclick = () => copyText(answer, $('r-copy'));
+}
+
+/* =========================================================
+   ② 그래프·기울기: 최소제곱법 직선 맞춤
+   ========================================================= */
+
+const TRANSFORMS = {
+  none: { f: v => v,            name: n => n,          unit: u => u,                        ok: v => true },
+  sq:   { f: v => v * v,        name: n => n + '²',    unit: u => u ? u + '²' : '',         ok: v => true },
+  sqrt: { f: v => Math.sqrt(v), name: n => '√' + n,    unit: u => u ? '√' + u : '',         ok: v => v >= 0 },
+  inv:  { f: v => 1 / v,        name: n => '1/' + n,   unit: u => u ? '1/' + u : '',        ok: v => v !== 0 },
+  ln:   { f: v => Math.log(v),  name: n => 'ln ' + n, unit: u => '',                       ok: v => v > 0 },
+};
+
+// 한 줄에 숫자 두 개씩 읽는다. 숫자가 두 개 안 되는 줄(제목 등)은 건너뛴다.
+// 표에 입력한 그대로(0.90처럼 끝의 0까지) 보여 주려고 글자도 같이 저장한다.
+function parsePairs(text) {
+  const xs = [], ys = [], xText = [], yText = [], skipped = [];
+  text.split(/\n/).forEach(line => {
+    if (line.trim() === '') return;
+    const tokens = line.split(/[\s,;]+/).filter(t => t !== '' && isFinite(Number(t.replace('−', '-'))));
+    if (tokens.length >= 2) {
+      xText.push(tokens[0]); yText.push(tokens[1]);
+      xs.push(Number(tokens[0].replace('−', '-'))); ys.push(Number(tokens[1].replace('−', '-')));
+    } else skipped.push(line.trim());
+  });
+  return { xs, ys, xText, yText, skipped };
+}
+
+// 최소제곱법. model이 'ab'이면 y = ax + b, 'a0'이면 y = ax
+function fitLine(xs, ys, model) {
+  const n = xs.length;
+  const sx = xs.reduce((a, b) => a + b, 0), sy = ys.reduce((a, b) => a + b, 0);
+  const xbar = sx / n, ybar = sy / n;
+  let Sxx = 0, Sxy = 0, Syy = 0, Sx2 = 0, Sxy0 = 0;
+  for (let i = 0; i < n; i++) {
+    Sxx += (xs[i] - xbar) ** 2;
+    Sxy += (xs[i] - xbar) * (ys[i] - ybar);
+    Syy += (ys[i] - ybar) ** 2;
+    Sx2 += xs[i] ** 2;
+    Sxy0 += xs[i] * ys[i];
+  }
+  let a, b, sa, sb, SSR = 0, dof;
+  if (model === 'ab') {
+    a = Sxy / Sxx;
+    b = ybar - a * xbar;
+    for (let i = 0; i < n; i++) SSR += (ys[i] - (a * xs[i] + b)) ** 2;
+    dof = n - 2;
+    const s = Math.sqrt(SSR / dof);
+    sa = s / Math.sqrt(Sxx);
+    sb = s * Math.sqrt(Sx2 / (n * Sxx));
+  } else {
+    a = Sxy0 / Sx2;
+    b = 0;
+    for (let i = 0; i < n; i++) SSR += (ys[i] - a * xs[i]) ** 2;
+    dof = n - 1;
+    const s = Math.sqrt(SSR / dof);
+    sa = s / Math.sqrt(Sx2);
+    sb = NaN;
+  }
+  const R2 = 1 - SSR / Syy;
+  return { n, xbar, ybar, Sxx, Sxy, Syy, Sx2, Sxy0, a, b, sa, sb, SSR, dof, R2 };
+}
+
+function slopeUnit(yu, xu) {
+  if (!xu && !yu) return '';
+  if (!xu) return yu;
+  if (xu.startsWith('1/')) return (yu ? yu + '·' : '') + xu.slice(2);
+  const x = /[\/·]/.test(xu) ? '(' + xu + ')' : xu;
+  return (yu || '1') + '/' + x;
+}
+
+// "값 ± 불확도" 글자를 만든다. 불확도를 못 구하면 유효숫자 4개로만 보여 준다.
+function pmText(v, u, k) {
+  if (!(u > 0) || !isFinite(u)) return { text: show(v, 4), lsd: null };
+  const U = roundUncertainty(u, k);
+  return { text: fixedAt(v, U.lsd) + ' ± ' + fixedAt(U.value, U.lsd), lsd: U.lsd };
+}
+
+// 눈금 간격을 1, 2, 5 × 10^n 중에서 고른다.
+function niceTicks(min, max, count = 5) {
+  if (min === max) { min -= 1; max += 1; }
+  const raw = (max - min) / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  const start = Math.floor(min / step) * step, end = Math.ceil(max / step) * step;
+  const ticks = [];
+  for (let v = start; v <= end + step * 1e-9; v += step) ticks.push(clean(v));
+  const dec = Math.max(0, -Math.floor(Math.log10(step)));
+  return { ticks, start, end, dec };
+}
+
+function drawGraph(xs, ys, fit, model, xlabel, ylabel, width) {
+  // 화면 폭에 맞춰 그려서 휴대폰에서도 글자가 작아지지 않게 한다.
+  const W = Math.round(Math.max(300, Math.min(640, width))), H = Math.round(W * 0.62);
+  const L = 62, R = 16, T = 16, B = 52;
+  let xmin = Math.min(...xs), xmax = Math.max(...xs);
+  if (model === 'a0') { xmin = Math.min(0, xmin); xmax = Math.max(0, xmax); }
+  const lineY = [fit.a * xmin + fit.b, fit.a * xmax + fit.b];
+  let ymin = Math.min(...ys, ...lineY), ymax = Math.max(...ys, ...lineY);
+  const tx = niceTicks(xmin, xmax), ty = niceTicks(ymin, ymax);
+  const X = v => L + (v - tx.start) / (tx.end - tx.start) * (W - L - R);
+  const Y = v => H - B - (v - ty.start) / (ty.end - ty.start) * (H - T - B);
+
+  let s = `<svg class="graph" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+  // 모눈과 눈금
+  tx.ticks.forEach(v => {
+    s += `<line x1="${X(v)}" y1="${T}" x2="${X(v)}" y2="${H - B}" stroke="#dde7f0"/>`;
+    s += `<text x="${X(v)}" y="${H - B + 18}" font-size="12" text-anchor="middle" fill="#46607a">${v.toFixed(tx.dec)}</text>`;
+  });
+  ty.ticks.forEach(v => {
+    s += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" stroke="#dde7f0"/>`;
+    s += `<text x="${L - 8}" y="${Y(v) + 4}" font-size="12" text-anchor="end" fill="#46607a">${v.toFixed(ty.dec)}</text>`;
+  });
+  // 축
+  s += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="none" stroke="#0b5563" stroke-width="1.5"/>`;
+  s += `<text x="${(L + W - R) / 2}" y="${H - 12}" font-size="14" text-anchor="middle" fill="#1c2a39">${esc(xlabel)}</text>`;
+  s += `<text x="18" y="${(T + H - B) / 2}" font-size="14" text-anchor="middle" fill="#1c2a39" transform="rotate(-90 18 ${(T + H - B) / 2})">${esc(ylabel)}</text>`;
+  // 맞춘 직선
+  s += `<line x1="${X(xmin)}" y1="${Y(lineY[0])}" x2="${X(xmax)}" y2="${Y(lineY[1])}" stroke="#c96a00" stroke-width="2.5"/>`;
+  // 측정점
+  xs.forEach((x, i) => { s += `<circle cx="${X(x)}" cy="${Y(ys[i])}" r="5" fill="#0b5563"/>`; });
+  s += '</svg>';
+  return s;
+}
+
+function runGraph() {
+  const out = $('g-out');
+  const xn = $('g-xn').value.trim() || 'x', xu = $('g-xu').value.trim();
+  const yn = $('g-yn').value.trim() || 'y', yu = $('g-yu').value.trim();
+  const tX = TRANSFORMS[$('g-xt').value], tY = TRANSFORMS[$('g-yt').value];
+  const model = $('g-model').value;
+  const k = Number($('g-k').value);
+  const { xs: rawX, ys: rawY, xText, yText, skipped } = parsePairs($('g-data').value);
+  let html = '';
+
+  if (skipped.length) html += `<p class="note">숫자가 두 개 안 돼서 건너뛴 줄(제목 줄 등): ${esc(skipped.join(' / '))}</p>`;
+  const bad = [];
+  rawX.forEach((x, i) => { if (!tX.ok(x) || !tY.ok(rawY[i])) bad.push(i + 1); });
+  if (bad.length) { out.innerHTML = html + `<div class="warn">${bad.join(', ')}번째 점은 고른 변환을 할 수 없어요 (0이나 음수의 로그, 음수의 제곱근, 0의 역수).</div>`; return; }
+
+  const xs = rawX.map(tX.f), ys = rawY.map(tY.f);
+  const need = model === 'ab' ? 3 : 2;
+  if (xs.length < need) { out.innerHTML = html + `<div class="warn">기울기의 불확도까지 구하려면 점이 ${need}개 이상 필요해요.</div>`; return; }
+  if (model === 'ab' && xs.every(v => v === xs[0])) { out.innerHTML = html + '<div class="warn">x 값이 모두 같아서 기울기를 구할 수 없어요.</div>'; return; }
+
+  const fit = fitLine(xs, ys, model);
+  const XN = tX.name(xn), YN = tY.name(yn);
+  const XU = tX.unit(xu), YU = tY.unit(yu);
+  const aU = slopeUnit(YU, XU);
+  const A = pmText(fit.a, fit.sa, k);
+  const aLine = `기울기 a = ${A.text}${aU ? ' ' + aU : ''}`;
+  let bLine = '';
+  if (model === 'ab') { const Bt = pmText(fit.b, fit.sb, k); bLine = `절편 b = ${Bt.text}${YU ? ' ' + YU : ''}`; }
+  const copyAll = aLine + (bLine ? '\n' + bLine : '') + `\nR² = ${fit.R2.toFixed(4)}`;
+
+  html += `<div class="answer-line"><span class="answer">${esc(aLine)}</span><button class="copy" id="g-copy">복사</button></div>`;
+  if (bLine) html += `<div><span class="answer" style="font-size:20px">${esc(bLine)}</span></div>`;
+  html += `<p class="note">점 ${fit.n}개 · 결정계수 R² = ${fit.R2.toFixed(4)} · 불확도는 최소제곱법 기울기·절편의 표준오차</p>`;
+  html += drawGraph(xs, ys, fit, model, XN + (XU ? ' (' + XU + ')' : ''), YN + (YU ? ' (' + YU + ')' : ''), out.clientWidth || 640);
+
+  // 입력값 표 (변환한 축이 있으면 그 열을 덧붙인다)
+  const xChanged = tX !== TRANSFORMS.none, yChanged = tY !== TRANSFORMS.none;
+  const changed = xChanged || yChanged;
+  const head = [xn, yn].concat(xChanged ? [XN] : [], yChanged ? [YN] : []);
+  const rows = rawX.map((x, i) => [xText[i], yText[i]].concat(xChanged ? [show(xs[i], 5)] : [], yChanged ? [show(ys[i], 5)] : []));
+  html += `<div class="scroll"><table><tr><th>i</th>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr>
+    ${rows.map((r, i) => `<tr><td>${i + 1}</td>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}
+    </table></div><button class="copy" id="g-copytable">표 복사 (엑셀·한글에 붙여 넣기)</button>`;
+
+  // ----- 계산 과정 -----
+  let steps = '<ol>';
+  if (changed) steps += `<li>그래프 축으로 쓸 값으로 바꾼다: x축은 <b>${esc(XN)}</b>, y축은 <b>${esc(YN)}</b> (표 참고)</li>`;
+  if (model === 'ab') {
+    steps += `<li>평균: <span class="eq">x̄ = ${show(fit.xbar)}, ȳ = ${show(fit.ybar)}</span></li>`;
+    steps += `<li><span class="eq">Sxx = Σ(xᵢ − x̄)² = ${show(fit.Sxx)}</span>, <span class="eq">Sxy = Σ(xᵢ − x̄)(yᵢ − ȳ) = ${show(fit.Sxy)}</span></li>`;
+    steps += `<li>기울기: <span class="eq">a = Sxy ÷ Sxx = ${show(fit.Sxy)} ÷ ${show(fit.Sxx)} = ${show(fit.a)}</span></li>`;
+    steps += `<li>절편: <span class="eq">b = ȳ − a·x̄ = ${show(fit.ybar)} − ${show(fit.a)} × ${show(fit.xbar)} = ${show(fit.b)}</span></li>`;
+    steps += `<li>직선에서 벗어난 정도: <span class="eq">잔차 제곱합 = Σ(yᵢ − (a xᵢ + b))² = ${show(fit.SSR)}</span>, <span class="eq">s = √(${show(fit.SSR)} ÷ (n − 2)) = ${show(Math.sqrt(fit.SSR / fit.dof))}</span></li>`;
+    steps += `<li>기울기의 불확도: <span class="eq">s ÷ √Sxx = ${show(fit.sa)}</span>, 절편의 불확도: <span class="eq">s × √(Σx² ÷ (n·Sxx)) = ${show(fit.sb)}</span></li>`;
+  } else {
+    steps += `<li>원점을 지나는 직선의 기울기: <span class="eq">a = Σxy ÷ Σx² = ${show(fit.Sxy0)} ÷ ${show(fit.Sx2)} = ${show(fit.a)}</span></li>`;
+    steps += `<li>잔차 제곱합: <span class="eq">Σ(yᵢ − a xᵢ)² = ${show(fit.SSR)}</span>, <span class="eq">s = √(${show(fit.SSR)} ÷ (n − 1)) = ${show(Math.sqrt(fit.SSR / fit.dof))}</span></li>`;
+    steps += `<li>기울기의 불확도: <span class="eq">s ÷ √Σx² = ${show(fit.sa)}</span></li>`;
+  }
+  steps += `<li>결정계수: <span class="eq">R² = 1 − 잔차 제곱합 ÷ Σ(yᵢ − ȳ)² = 1 − ${show(fit.SSR)} ÷ ${show(fit.Syy)} = ${fit.R2.toFixed(4)}</span> (1에 가까울수록 직선에 잘 맞음)</li>`;
+  steps += `<li>불확도를 유효숫자 ${k}자리로 반올림하고 값도 같은 자리까지 맞춘다: <b>${esc(aLine)}</b>${bLine ? ', <b>' + esc(bLine) + '</b>' : ''}</li></ol>`;
+  html += `<details class="steps"><summary>계산 과정 보기</summary>${steps}</details>`;
+
+  out.innerHTML = html;
+  $('g-copy').onclick = () => copyText(copyAll, $('g-copy'));
+  const tsv = [head.join('\t')].concat(rows.map(r => r.join('\t'))).join('\n');
+  $('g-copytable').onclick = () => copyText(tsv, $('g-copytable'));
+}
+
+/* =========================================================
+   ③ 유효숫자 계산
+   각 수를 { 값, 유효숫자 개수(sf), 마지막 유효 자리(lsd) } 로 들고 다닌다.
+   - 덧셈·뺄셈: 마지막 자리가 가장 높은(덜 정밀한) 수에 맞춘다.
+   - 곱셈·나눗셈·거듭제곱: 유효숫자 개수가 가장 적은 수에 맞춘다.
+   계산 자체는 끝까지 반올림하지 않고, 남길 자릿수만 따라간다.
+   ========================================================= */
+
+// 글자로 쓴 숫자 하나의 유효숫자를 센다. 예: "0.00450" → 3개
+function countSig(str) {
+  let s = str.replace('−', '-').replace(/^[+-]/, '');
+  let exp = 0;
+  const m = s.match(/^(.*?)[eE]([+-]?\d+)$/);
+  if (m) { s = m[1]; exp = Number(m[2]); }
+  let sf, lsd, note = '';
+  if (s.includes('.')) {
+    const decimals = s.length - s.indexOf('.') - 1;
+    const digits = s.replace('.', '').replace(/^0+/, '');
+    sf = digits.length;
+    lsd = -decimals + exp;
+    if (sf === 0) { sf = 1; note = '0으로만 된 값'; }
+  } else {
+    const digits = s.replace(/^0+/, '');
+    const trailing = (digits.match(/0+$/) || [''])[0].length;
+    sf = Math.max(1, digits.length - trailing);
+    lsd = trailing + exp;
+    if (trailing > 0 && digits.length > 1) {
+      note = `${str}처럼 끝이 0인 정수는 유효숫자가 애매해서 ${sf}개로 봤어요. 0까지 유효하면 ${str}. 이나 지수 표기(예: ${(Number(digits) / Math.pow(10, digits.length - 1)).toFixed(digits.length - 1)}e${digits.length - 1 + exp})로 쓰세요.`;
+    }
+    if (digits.length === 0) { sf = 1; lsd = exp; }
+  }
+  return { sf, lsd, note };
+}
+
+// 식을 낱말(토큰)로 쪼갠다.
+function tokenize(expr) {
+  const src = expr.replace(/×|·/g, '*').replace(/÷/g, '/').replace(/−/g, '-').replace(/π/g, 'pi');
+  const tokens = [];
+  const re = /\s*(?:(\{[^}]*\})|(\d+\.?\d*(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?)|(pi)|([+\-*/^()]))/y;
+  let pos = 0;
+  while (pos < src.length) {
+    if (/^\s*$/.test(src.slice(pos))) break;
+    re.lastIndex = pos;
+    const m = re.exec(src);
+    if (!m) throw new Error(`"${src.slice(pos).trim().slice(0, 10)}" 부분을 읽을 수 없어요.`);
+    if (m[1]) tokens.push({ type: 'exact', text: m[1].slice(1, -1).trim() });
+    else if (m[2]) tokens.push({ type: 'num', text: m[2] });
+    else if (m[3]) tokens.push({ type: 'pi', text: 'π' });
+    else tokens.push({ type: 'op', text: m[4] });
+    pos = re.lastIndex;
+  }
+  return tokens;
+}
+
+// 수 하나를 화면에 보여 줄 글자 (정확한 수는 그대로, 계산 결과는 유효숫자에 맞춰서)
+function qText(q) {
+  if (q.text) return q.text;
+  if (q.exact) return show(q.v, 6);
+  return q.sf >= 1 ? formatSig(q.v, q.sf) : '0';
+}
+
+function evaluateSig(expr) {
+  const tokens = tokenize(expr);
+  const steps = [], notes = [];
+  let i = 0;
+  const peek = () => tokens[i];
+  const take = () => tokens[i++];
+
+  function literal(t) {
+    if (t.type === 'pi') return { v: Math.PI, exact: true, sf: Infinity, lsd: -Infinity, text: 'π' };
+    if (t.type === 'exact') {
+      const v = Number(t.text);
+      if (!isFinite(v)) throw new Error(`{${t.text}}는 숫자가 아니에요.`);
+      return { v, exact: true, sf: Infinity, lsd: -Infinity, text: t.text };
+    }
+    const c = countSig(t.text);
+    if (c.note) notes.push(c.note);
+    return { v: Number(t.text), exact: false, sf: c.sf, lsd: c.lsd, text: t.text };
+  }
+
+  function addSub(a, b, op) {
+    const v = op === '+' ? a.v + b.v : a.v - b.v;
+    const sym = op === '+' ? '+' : '−';
+    if (a.exact && b.exact) return { v, exact: true, sf: Infinity, lsd: -Infinity };
+    const lsd = Math.max(a.lsd, b.lsd);
+    const sf = v === 0 ? 0 : orderOf(v) - lsd + 1;
+    const who = a.lsd >= b.lsd ? a : b;
+    const q = { v, exact: false, sf, lsd };
+    let line = `${qText(a)} ${sym} ${qText(b)} = ${show(v, 10)} → 덧셈·뺄셈이라 끝자리가 가장 높은 ${qText(who)}(${placeName(lsd)})에 맞춤`;
+    line += sf >= 1 ? ` → <b>${fixedAt(v, lsd)}</b> (유효숫자 ${sf}개)` : ' → 측정 정밀도보다 작은 차이라서 유효숫자가 남지 않아요.';
+    steps.push(line);
+    return q;
+  }
+
+  function mulDiv(a, b, op) {
+    if (op === '/' && b.v === 0) throw new Error('0으로 나눌 수 없어요.');
+    const v = op === '*' ? a.v * b.v : a.v / b.v;
+    const sym = op === '*' ? '×' : '÷';
+    if (a.exact && b.exact) {
+      steps.push(`${qText(a)} ${sym} ${qText(b)} = ${show(v, 6)} → 정확한 수끼리라 유효숫자 제한 없음`);
+      return { v, exact: true, sf: Infinity, lsd: -Infinity };
+    }
+    const sf = Math.min(a.sf, b.sf);
+    const lsd = v === 0 ? 0 : orderOf(v) - sf + 1;
+    const who = a.sf <= b.sf ? a : b;
+    steps.push(`${qText(a)} ${sym} ${qText(b)} = ${show(v, 10)} → 곱셈·나눗셈이라 유효숫자가 가장 적은 ${qText(who)}(${sf}개)에 맞춤 → <b>${formatSig(v, sf)}</b>`);
+    return { v, exact: false, sf, lsd };
+  }
+
+  function power(a, n) {
+    const v = Math.pow(a.v, n.v);
+    if (a.exact) {
+      steps.push(`${qText(a)}^${show(n.v, 10)} = ${show(v, 6)} → 정확한 수라 유효숫자 제한 없음`);
+      return { v, exact: true, sf: Infinity, lsd: -Infinity };
+    }
+    const sf = a.sf;
+    const lsd = v === 0 ? 0 : orderOf(v) - sf + 1;
+    steps.push(`${qText(a)}^${show(n.v, 10)} = ${show(v, 10)} → 거듭제곱은 밑의 유효숫자(${sf}개)를 따름 → <b>${formatSig(v, sf)}</b>`);
+    return { v, exact: false, sf, lsd };
+  }
+
+  // 문법: 식 = 항 (± 항)*, 항 = 거듭 (×÷ 거듭)*, 거듭 = 단항 (^ 지수)?, 단항 = -단항 | 기본
+  function parseExpr() {
+    let a = parseTerm();
+    while (peek() && (peek().text === '+' || peek().text === '-')) {
+      const op = take().text;
+      a = addSub(a, parseTerm(), op);
+    }
+    return a;
+  }
+  function parseTerm() {
+    let a = parsePower();
+    while (peek() && (peek().text === '*' || peek().text === '/')) {
+      const op = take().text;
+      a = mulDiv(a, parsePower(), op);
+    }
+    return a;
+  }
+  function parsePower() {
+    const a = parseUnary();
+    if (peek() && peek().text === '^') {
+      take();
+      let neg = false;
+      if (peek() && peek().text === '-') { take(); neg = true; }
+      const t = take();
+      if (!t || (t.type !== 'num' && t.type !== 'exact')) throw new Error('^ 뒤에는 지수(숫자)가 와야 해요.');
+      const n = Number(t.text);
+      return power(a, { v: neg ? -n : n });   // 지수는 정확한 수로 본다
+    }
+    return a;
+  }
+  function parseUnary() {
+    if (peek() && peek().text === '-') {
+      take();
+      const a = parseUnary();
+      return Object.assign({}, a, { v: -a.v, text: a.text ? '−' + a.text : undefined });
+    }
+    if (peek() && peek().text === '+') { take(); return parseUnary(); }
+    return parsePrimary();
+  }
+  function parsePrimary() {
+    const t = take();
+    if (!t) throw new Error('식이 중간에 끝났어요.');
+    if (t.text === '(') {
+      const a = parseExpr();
+      const c = take();
+      if (!c || c.text !== ')') throw new Error('괄호가 닫히지 않았어요.');
+      return Object.assign({}, a, { text: undefined });
+    }
+    if (t.type === 'num' || t.type === 'exact' || t.type === 'pi') return literal(t);
+    throw new Error(`"${t.text}"가 들어갈 자리가 아니에요.`);
+  }
+
+  if (tokens.length === 0) throw new Error('식을 넣어 주세요.');
+  const result = parseExpr();
+  if (i < tokens.length) throw new Error(`"${tokens[i].text}" 근처를 이해하지 못했어요.`);
+  return { result, steps, notes, single: tokens.length === 1 || (tokens.length === 2 && tokens[0].text === '-') };
+}
+
+function runSig() {
+  const out = $('s-out');
+  const expr = $('s-expr').value;
+  let r;
+  try { r = evaluateSig(expr); }
+  catch (e) { out.innerHTML = `<div class="warn">${esc(e.message)}</div>`; return; }
+  const q = r.result;
+  let html = '';
+  r.notes.forEach(n => html += `<div class="warn">${esc(n)}</div>`);
+
+  if (r.single) {
+    if (q.exact) html += `<div class="answer">정확한 수</div><p class="note">개수나 정의값은 유효숫자 계산에서 제한을 두지 않아요.</p>`;
+    else html += `<div class="answer-line"><span class="answer">유효숫자 ${q.sf}개</span></div>
+      <p class="note">마지막 유효 자리: ${placeName(q.lsd)} · 앞에 붙은 0은 세지 않고, 소수점 아래 끝의 0은 셉니다.</p>`;
+    out.innerHTML = html; return;
+  }
+
+  let answer;
+  if (q.exact) answer = show(q.v, 10) + ' (정확한 수끼리의 계산)';
+  else if (q.sf >= 1) answer = formatSig(q.v, q.sf);
+  else answer = '0 (유효숫자 없음)';
+  html += `<div class="answer-line"><span class="answer">${esc(answer)}</span><button class="copy" id="s-copy">복사</button></div>`;
+  if (!q.exact && q.sf >= 1) html += `<p class="note">유효숫자 ${q.sf}개 · 반올림 전 계산값 ${show(q.v, 10)}</p>`;
+  html += `<details class="steps" open><summary>계산 과정 보기</summary><ol>${r.steps.map(s => `<li>${s}</li>`).join('')}</ol>
+    <p class="note">중간 단계에서 굵게 쓴 값은 "몇 자리까지 의미가 있는지"를 보여 주는 것이고, 실제 계산은 반올림하지 않은 값으로 이어 갑니다.</p></details>`;
+  out.innerHTML = html;
+  $('s-copy').onclick = () => copyText(answer, $('s-copy'));
+}
+
+/* =========================================================
+   화면 연결: 탭, 버튼, 예시
+   ========================================================= */
+document.querySelectorAll('.tabs button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('on', p.id === b.dataset.tab));
+  };
+});
+
+function syncInstBox() {
+  const m = $('r-mode').value;
+  $('r-inst-box').style.display = (m === 'inst' || m === 'comb') ? '' : 'none';
+}
+$('r-mode').onchange = syncInstBox;
+syncInstBox();
+
+$('r-run').onclick = runRepeat;
+$('g-run').onclick = runGraph;
+$('s-run').onclick = runSig;
+$('s-expr').addEventListener('keydown', e => { if (e.key === 'Enter') runSig(); });
+
+$('r-ex').onclick = () => {
+  $('r-name').value = 't'; $('r-unit').value = 's';
+  $('r-data').value = '0.452 0.447 0.461 0.455 0.449';
+  $('r-mode').value = 'se'; syncInstBox();
+  runRepeat();
+};
+$('g-ex').onclick = () => {
+  $('g-xn').value = 'L'; $('g-xu').value = 'm'; $('g-xt').value = 'none';
+  $('g-yn').value = 'T'; $('g-yu').value = 's'; $('g-yt').value = 'sq';
+  $('g-data').value = '줄 길이(m)\t주기(s)\n0.20\t0.90\n0.30\t1.10\n0.40\t1.27\n0.50\t1.42\n0.60\t1.55\n0.70\t1.68';
+  $('g-model').value = 'ab';
+  runGraph();
+};
+$('s-ex').onclick = () => {
+  $('s-expr').value = '{4} × pi^2 × 0.500 ÷ 1.42^2';
+  runSig();
+};
+</script>
+</body>
+</html>
